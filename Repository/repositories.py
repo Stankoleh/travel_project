@@ -10,7 +10,11 @@ class CountryRepository:
     def add(self, country):
         country.save()
 
+    def update(self, country):
+        country.save()
 
+    def delete(self, country):
+        country.delete()
 class ClientRepository:
     def get_all(self):
         return Client.objects.all()
@@ -21,6 +25,11 @@ class ClientRepository:
     def add(self, client):
         client.save()
 
+    def update(self, client):
+        client.save()
+
+    def delete(self, client):
+        client.delete()
 
 class JourneyRepository:
     def get_all(self):

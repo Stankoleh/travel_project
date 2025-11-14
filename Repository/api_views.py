@@ -59,3 +59,59 @@ class CountryRetrieveUpdateDeleteApiView(APIView):
             uow.countries.delete(country)
             uow.commit()
             return Response(status=204)
+
+class ClientListCreateApiView(APIView):
+    authentication_classes = [BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        with UnitOfWork() as uow:
+            clients = uow.clients.get_all()
+            serializer = ClientSerializer(clients, many=True)
+            return Response(serializer.data)
+
+    def post(self, request):
+        serializer = ClientSerializer(data=request.data)
+        if serializer.is_valid():
+            with UnitOfWork() as uow:
+                client = serializer.save()
+                uow.clients.add(client)
+                uow.commit()
+            return Response(ClientSerializer(client).data, status=201)
+        return Response(serializer.errors, status=400)
+
+
+class ClientRetrieveUpdateDeleteApiView(APIView):
+    authentication_classes = [BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        with UnitOfWork() as uow:
+            client = uow.clients.get_by_id(pk)
+            if not client:
+                return Response({"error": "Client not found"}, status=404)
+            return Response(ClientSerializer(client).data)
+
+    def put(self, request, pk):
+        with UnitOfWork() as uow:
+            client = uow.clients.get_by_id(pk)
+            if not client:
+                return Response({"error": "Client not found"}, status=404)
+
+            serializer = ClientSerializer(client, data=request.data)
+            if serializer.is_valid():
+                updated = serializer.save()
+                uow.clients.update(updated)
+                uow.commit()
+                return Response(ClientSerializer(updated).data)
+            return Response(serializer.errors, status=400)
+
+    def delete(self, request, pk):
+        with UnitOfWork() as uow:
+            client = uow.clients.get_by_id(pk)
+            if not client:
+                return Response({"error": "Client not found"}, status=404)
+
+            uow.clients.delete(client)
+            uow.commit()
+            return Response(status=204)
