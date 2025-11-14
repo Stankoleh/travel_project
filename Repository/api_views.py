@@ -1,117 +1,108 @@
-from rest_framework.authentication import BasicAuthentication
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.authentication import BasicAuthentication
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
 from .unit_of_work import UnitOfWork
-from .serializers import CountrySerializer, ClientSerializer, JourneySerializer
+from .serializers import (
+    CountrySerializer, ClientSerializer, ContactInfoSerializer,
+    ContractSerializer, ResidenceSerializer, TransportSerializer,
+    JourneySerializer
+)
 
-class CountryListCreateApiView(APIView):
+class GenericCRUDAPIView(APIView):
+    serializer_class = None
+    repository_attr = None
+
+    authentication_classes = [BasicAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_uow_repo(self):
+        uow = UnitOfWork()
+        return uow, getattr(uow, self.repository_attr)
+
+    def get(self, request, pk=None):
+        uow, repo = self.get_uow_repo()
+        if pk:
+            obj = repo.get_by_id(pk)
+            if not obj:
+                return Response({"error": "Not found"}, status=404)
+            return Response(self.serializer_class(obj).data)
+        objs = repo.get_all()
+        return Response(self.serializer_class(objs, many=True).data)
+
+    def post(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            uow, repo = self.get_uow_repo()
+            obj = serializer.save()
+            repo.add(obj)
+            uow.commit()
+            return Response(self.serializer_class(obj).data, status=201)
+        return Response(serializer.errors, status=400)
+
+    def put(self, request, pk):
+        uow, repo = self.get_uow_repo()
+        obj = repo.get_by_id(pk)
+        if not obj:
+            return Response({"error": "Not found"}, status=404)
+        serializer = self.serializer_class(obj, data=request.data)
+        if serializer.is_valid():
+            updated = serializer.save()
+            repo.update(updated)
+            uow.commit()
+            return Response(self.serializer_class(updated).data)
+        return Response(serializer.errors, status=400)
+
+    def delete(self, request, pk):
+        uow, repo = self.get_uow_repo()
+        obj = repo.get_by_id(pk)
+        if not obj:
+            return Response({"error": "Not found"}, status=404)
+        repo.delete(obj)
+        uow.commit()
+        return Response(status=204)
+
+
+class CountryApiView(GenericCRUDAPIView):
+    serializer_class = CountrySerializer
+    repository_attr = 'countries'
+
+class ClientApiView(GenericCRUDAPIView):
+    serializer_class = ClientSerializer
+    repository_attr = 'clients'
+
+class ContactInfoApiView(GenericCRUDAPIView):
+    serializer_class = ContactInfoSerializer
+    repository_attr = 'contacts'
+
+class ContractApiView(GenericCRUDAPIView):
+    serializer_class = ContractSerializer
+    repository_attr = 'contracts'
+
+class ResidenceApiView(GenericCRUDAPIView):
+    serializer_class = ResidenceSerializer
+    repository_attr = 'residences'
+
+class TransportApiView(GenericCRUDAPIView):
+    serializer_class = TransportSerializer
+    repository_attr = 'transports'
+
+class JourneyApiView(GenericCRUDAPIView):
+    serializer_class = JourneySerializer
+    repository_attr = 'journeys'
+
+class AggregatedReportApiView(APIView):
     authentication_classes = [BasicAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         with UnitOfWork() as uow:
-            countries = uow.countries.get_all()
-            serializer = CountrySerializer(countries, many=True)
-            return Response(serializer.data)
-
-    def post(self, request):
-        serializer = CountrySerializer(data=request.data)
-        if serializer.is_valid():
-            with UnitOfWork() as uow:
-                country = serializer.save()
-                uow.countries.add(country)
-                uow.commit()
-                return Response(CountrySerializer(country).data, status=201)
-        return Response(serializer.errors, status=400)
-
-
-class CountryRetrieveUpdateDeleteApiView(APIView):
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, pk):
-        with UnitOfWork() as uow:
-            country = uow.countries.get_by_id(pk)
-            if not country:
-                return Response({"error": "Country not found"}, status=404)
-            return Response(CountrySerializer(country).data)
-
-    def put(self, request, pk):
-        with UnitOfWork() as uow:
-            country = uow.countries.get_by_id(pk)
-            if not country:
-                return Response({"error": "Country not found"}, status=404)
-
-            serializer = CountrySerializer(country, data=request.data)
-            if serializer.is_valid():
-                updated = serializer.save()
-                uow.countries.update(updated)
-                uow.commit()
-                return Response(CountrySerializer(updated).data)
-            return Response(serializer.errors, status=400)
-
-    def delete(self, request, pk):
-        with UnitOfWork() as uow:
-            country = uow.countries.get_by_id(pk)
-            if not country:
-                return Response({"error": "Country not found"}, status=404)
-            uow.countries.delete(country)
-            uow.commit()
-            return Response(status=204)
-
-class ClientListCreateApiView(APIView):
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        with UnitOfWork() as uow:
-            clients = uow.clients.get_all()
-            serializer = ClientSerializer(clients, many=True)
-            return Response(serializer.data)
-
-    def post(self, request):
-        serializer = ClientSerializer(data=request.data)
-        if serializer.is_valid():
-            with UnitOfWork() as uow:
-                client = serializer.save()
-                uow.clients.add(client)
-                uow.commit()
-            return Response(ClientSerializer(client).data, status=201)
-        return Response(serializer.errors, status=400)
-
-
-class ClientRetrieveUpdateDeleteApiView(APIView):
-    authentication_classes = [BasicAuthentication]
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, pk):
-        with UnitOfWork() as uow:
-            client = uow.clients.get_by_id(pk)
-            if not client:
-                return Response({"error": "Client not found"}, status=404)
-            return Response(ClientSerializer(client).data)
-
-    def put(self, request, pk):
-        with UnitOfWork() as uow:
-            client = uow.clients.get_by_id(pk)
-            if not client:
-                return Response({"error": "Client not found"}, status=404)
-
-            serializer = ClientSerializer(client, data=request.data)
-            if serializer.is_valid():
-                updated = serializer.save()
-                uow.clients.update(updated)
-                uow.commit()
-                return Response(ClientSerializer(updated).data)
-            return Response(serializer.errors, status=400)
-
-    def delete(self, request, pk):
-        with UnitOfWork() as uow:
-            client = uow.clients.get_by_id(pk)
-            if not client:
-                return Response({"error": "Client not found"}, status=404)
-
-            uow.clients.delete(client)
-            uow.commit()
-            return Response(status=204)
+            report = {
+                "total_countries": uow.countries.get_all().count(),
+                "total_clients": uow.clients.get_all().count(),
+                "total_journeys": uow.journeys.get_all().count(),
+                "active_residences": uow.residences.get_all().filter(occupied=False).count(),
+                "scheduled_transports": uow.transports.get_all().filter(status="scheduled").count(),
+            }
+            return Response(report)
