@@ -15,6 +15,7 @@ class CountryRepository:
 
     def delete(self, country):
         country.delete()
+
 class ClientRepository:
     def get_all(self):
         return Client.objects.all()
@@ -33,7 +34,6 @@ class ClientRepository:
 
 class JourneyRepository:
     def get_all(self):
-        # ManyToManyField → без select_related
         return Journey.objects.prefetch_related('clients', 'country').all()
 
     def get_by_id(self, journey_id):

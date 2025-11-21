@@ -9,7 +9,7 @@ from .serializers import (
     JourneySerializer
 )
 
-class GenericCRUDAPIView(APIView):
+class APIViewG(APIView):
     serializer_class = None
     repository_attr = None
 
@@ -30,17 +30,7 @@ class GenericCRUDAPIView(APIView):
         objs = repo.get_all()
         return Response(self.serializer_class(objs, many=True).data)
 
-    def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        if serializer.is_valid():
-            uow, repo = self.get_uow_repo()
-            obj = serializer.save()
-            repo.add(obj)
-            uow.commit()
-            return Response(self.serializer_class(obj).data, status=201)
-        return Response(serializer.errors, status=400)
-
-    def put(self, request, pk):
+    def update(self, request, pk):
         uow, repo = self.get_uow_repo()
         obj = repo.get_by_id(pk)
         if not obj:
@@ -63,31 +53,31 @@ class GenericCRUDAPIView(APIView):
         return Response(status=204)
 
 
-class CountryApiView(GenericCRUDAPIView):
+class CountryApiView(APIViewG):
     serializer_class = CountrySerializer
     repository_attr = 'countries'
 
-class ClientApiView(GenericCRUDAPIView):
+class ClientApiView(APIViewG):
     serializer_class = ClientSerializer
     repository_attr = 'clients'
 
-class ContactInfoApiView(GenericCRUDAPIView):
+class ContactInfoApiView(APIViewG):
     serializer_class = ContactInfoSerializer
     repository_attr = 'contacts'
 
-class ContractApiView(GenericCRUDAPIView):
+class ContractApiView(APIViewG):
     serializer_class = ContractSerializer
     repository_attr = 'contracts'
 
-class ResidenceApiView(GenericCRUDAPIView):
+class ResidenceApiView(APIViewG):
     serializer_class = ResidenceSerializer
     repository_attr = 'residences'
 
-class TransportApiView(GenericCRUDAPIView):
+class TransportApiView(APIViewG):
     serializer_class = TransportSerializer
     repository_attr = 'transports'
 
-class JourneyApiView(GenericCRUDAPIView):
+class JourneyApiView(APIViewG):
     serializer_class = JourneySerializer
     repository_attr = 'journeys'
 
@@ -97,11 +87,38 @@ class AggregatedReportApiView(APIView):
 
     def get(self, request):
         with UnitOfWork() as uow:
+            clients_with_journeys = (
+                uow.clients.get_all()
+                .filter(journeys__isnull=False)
+                .distinct()
+                .count()
+                )
+
+            journeys_with_country = (
+                    uow.journeys.get_all()
+                    .select_related("country")
+                    .count()
+                )
+
+            contracts_with_clients = (
+                    uow.contracts.get_all()
+                    .select_related("client")
+                    .count()
+                )
+
+            active_residences = (
+                uow.residences.get_all()
+                .select_related("country")
+                .filter(occupied=False)
+                .count()
+                )
+
             report = {
                 "total_countries": uow.countries.get_all().count(),
                 "total_clients": uow.clients.get_all().count(),
-                "total_journeys": uow.journeys.get_all().count(),
-                "active_residences": uow.residences.get_all().filter(occupied=False).count(),
-                "scheduled_transports": uow.transports.get_all().filter(status="scheduled").count(),
+                "clients_with_journeys": clients_with_journeys,
+                "journeys_with_country": journeys_with_country,
+                "contracts_with_clients": contracts_with_clients,
+                "active_residences": active_residences,
             }
             return Response(report)
