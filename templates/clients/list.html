@@ -1,0 +1,12 @@
+<h1>Countries</h1>
+<a href="{% url 'country_add' %}">Add country</a>
+
+<ul>
+{% for c in countries %}
+    <li>
+        <a href="{% url 'country_detail' c.id %}">
+            {{ c.name }} ({{ c.continent }})
+        </a>
+    </li>
+{% endfor %}
+</ul>

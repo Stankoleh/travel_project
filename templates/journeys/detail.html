@@ -1,0 +1,13 @@
+ <h1>{{ country.name }}</h1>
+<p>Continent: {{ country.continent }}</p>
+<p>Rating: {{ country.rating }}</p>
+<p>Active: {{ country.active }}</p>
+
+<a href="{% url 'country_edit' country.id %}">Edit</a>
+
+<form method="post" action="{% url 'country_delete' country.id %}">
+    {% csrf_token %}
+    <button type="submit">Delete</button>
+</form>
+
+<a href="{% url 'country_list' %}">Back to list</a>
